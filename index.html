@@ -1,0 +1,190 @@
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Webcam and Mic Test</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 40px;
+            padding: 16px;
+        }
+
+        .card {
+            background: #fcfcfd;
+            width: 100%;
+            max-width: 480px;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider {
+            width: 300px;
+            height: 10px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #4CAF50;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .cam-reload{
+            display: flex;
+            align-items: center;
+            justify-content: center; 
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            color: #1f2937;
+            background:#e8edf3;
+            border: 1px solid #d0d7de;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .cam-reload:hover{
+            color: #000;
+            background: linear-gradient(135deg, #0ff, #09f);
+            box-shadow: 0 0 25px #0ff, 0 0 50px #09f;
+            transform: translateY(-3px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+    <p><button class="cam-reload">Reload Connection</button></p>
+
+    <div class="cam-access"></div>
+    <div class="cam-failed"></div><p></p>
+    <div class="cam-type"></div>
+    <p></p><br>
+    <div class="mic-access"></div>
+    <p></p>
+    <div class="mic-slider">
+        <label>Mic Level:</label>
+        <input type="range" min="0" max="100" value="0" class="slider" disabled>
+    </div>
+    <p></p>
+    <video class="cam-camera" autoplay></video>
+
+    
+    <footer>
+        <p>&copy; 2025 CamCheck</p>
+        <p>Camera & Microphone Test Tool</p>
+        <p><i class="fa fa-lock" style="color:rgb(212, 98, 5)"></i> No camera or microphone data is recorded or stored.</p>
+    </footer>
+
+    <script>
+        let currentStream = null;
+        let micStream = null;
+
+        const cameraFeed = document.querySelector('.cam-camera');
+        const access = document.querySelector('.cam-access');
+        const failed = document.querySelector('.cam-failed');
+        const reloadBtn = document.querySelector('.cam-reload');
+        const camType = document.querySelector('.cam-type');
+        const micAccess = document.querySelector('.mic-access');
+        const slider = document.querySelector('.slider');
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+        }
+        function stopMic() {
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
+            slider.value = 0;
+        }
+
+
+        function startCamera() {
+            stopCamera();
+            cameraFeed.srcObject = null;
+            access.textContent = '';
+            failed.textContent = '';
+            camType.textContent = '';
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    currentStream = stream;
+                    access.innerHTML = '<i class="fa fa-check-circle" style="color:green"></i> Camera is working properly';
+                    cameraFeed.srcObject = stream;
+
+                    const cameraLabel = stream.getVideoTracks()[0].label;
+                    camType.textContent =`Camera name: ${cameraLabel}`
+
+                })
+                .catch(error => {
+                    failed.innerHTML = '<i class="fa fa-times-circle" style="color:red"></i> Camera is not working properly. Please check permissions.';
+                    console.error(error);
+                });
+        }
+
+        function startMic() {
+            stopMic();
+            micAccess.textContent = '';
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    micStream = stream;
+                    micAccess.innerHTML = '<i class="fa fa-check-circle" style="color:green"></i> Microphone is working properly';
+
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    const analyser = audioContext.createAnalyser();
+
+                    analyser.fftSize = 64;
+                    source.connect(analyser);
+
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                    function updateSlider(){
+                        analyser.getByteFrequencyData(dataArray);
+
+                        let sum = dataArray.reduce((a,b)=>a+b,0);
+                        let avg = sum / dataArray.length;
+                        slider.value = Math.min(Math.round(avg), 100);
+                        slider.style.background = `linear-gradient(to right, green ${slider.value}%, #ddd ${slider.value}%)`;
+
+                        requestAnimationFrame(updateSlider);
+                    }
+                    updateSlider();
+                })
+                .catch(error => {
+                    micAccess.innerHTML = '<i class="fa fa-times-circle" style="color:red"></i> Microphone is not working properly. Please check permissions.';
+                    console.error(error);
+                });
+        }
+        
+        
+        reloadBtn.addEventListener('click', ()=>{
+            startMic();
+            startCamera();
+        });
+        startMic();
+        startCamera();
+    </script>
+    </div>
+</body>
+</html>
+
+
